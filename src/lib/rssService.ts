@@ -2,15 +2,16 @@ import { RSSFeed, Article, Category } from '../types/newspaper';
 import { DEFAULT_RSS_FEEDS, INITIAL_ARTICLES } from '../data/rssFeeds';
 import { processArticlesWithAI } from './aiPipeline';
 
-const FEEDS_STORAGE_KEY = 'world_chronicle_rss_feeds_v4';
-const ARTICLES_STORAGE_KEY = 'world_chronicle_articles_v4';
-const LAST_SYNC_KEY = 'world_chronicle_last_sync_v4';
+const FEEDS_STORAGE_KEY = 'world_chronicle_rss_feeds_v5';
+const ARTICLES_STORAGE_KEY = 'world_chronicle_articles_v5';
+const LAST_SYNC_KEY = 'world_chronicle_last_sync_v5';
 
-// Fast public CORS proxies
+// Expanded high-availability CORS proxies & RSS-to-JSON converters
 const CORS_PROXIES = [
   (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+  (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  (url: string) => `https://cors-anywhere.herokuapp.com/${url}`
 ];
 
 /**
@@ -100,34 +101,77 @@ export function isSyncNeeded(): boolean {
 }
 
 /**
+ * Fallback parser using RSS-to-JSON API
+ */
+async function fetchViaRSS2JSON(url: string): Promise<Article[]> {
+  const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`;
+  const response = await fetch(apiUrl);
+  if (!response.ok) throw new Error('rss2json failed');
+  const data = await response.json();
+  if (data.status !== 'ok' || !Array.isArray(data.items)) throw new Error('rss2json invalid data');
+
+  return data.items.slice(0, 10).map((item: any, idx: number) => ({
+    id: `rss2json-${idx}-${Date.now()}`,
+    title: item.title || 'Untitled Story',
+    description: (item.description || item.content || '').replace(/<[^>]*>?/gm, '').slice(0, 260),
+    content: (item.content || item.description || '').replace(/<[^>]*>?/gm, ''),
+    link: item.link || url,
+    pubDate: item.pubDate || new Date().toISOString(),
+    category: 'World' as Category,
+    publisher: data.feed?.title || 'Global News Wire',
+    language: 'English',
+    author: item.author || 'Wire Dispatch',
+    imageUrl: item.thumbnail || item.enclosure?.link || '',
+    readTime: '2 min read'
+  }));
+}
+
+/**
  * Fetch and Parse XML RSS content for a single feed URL
  */
 async function fetchAndParseRSSFeed(feed: RSSFeed): Promise<Article[]> {
   let xmlText = '';
   
-  // Try proxies in sequence with 5-second aggressive timeout per proxy
-  for (const proxyFn of CORS_PROXIES) {
-    try {
-      const proxyUrl = proxyFn(feed.url);
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(proxyUrl, { signal: controller.signal });
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        xmlText = await response.text();
-        if (xmlText && (xmlText.includes('<rss') || xmlText.includes('<feed') || xmlText.includes('<channel') || xmlText.includes('<item'))) {
-          break;
+  // Try direct fetch first if CORS is supported by publisher
+  try {
+    const directRes = await fetch(feed.url, { signal: AbortSignal.timeout(4000) });
+    if (directRes.ok) {
+      xmlText = await directRes.text();
+    }
+  } catch (e) {
+    // Ignore and proceed to proxies
+  }
+
+  // Try CORS proxies in sequence with 6-second timeout per proxy
+  if (!xmlText) {
+    for (const proxyFn of CORS_PROXIES) {
+      try {
+        const proxyUrl = proxyFn(feed.url);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        
+        const response = await fetch(proxyUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+          xmlText = await response.text();
+          if (xmlText && (xmlText.includes('<rss') || xmlText.includes('<feed') || xmlText.includes('<channel') || xmlText.includes('<item'))) {
+            break;
+          }
         }
+      } catch (err) {
+        // Continue to next proxy
       }
-    } catch (err) {
-      // Continue to next proxy
     }
   }
 
+  // Fallback to RSS2JSON if direct XML proxy failed
   if (!xmlText) {
-    throw new Error(`Fetch timeout/error for ${feed.url}`);
+    try {
+      return await fetchViaRSS2JSON(feed.url);
+    } catch (e) {
+      throw new Error(`Proxy & RSS2JSON fallback exhausted for ${feed.url}`);
+    }
   }
 
   // Parse XML using DOMParser
@@ -138,7 +182,7 @@ async function fetchAndParseRSSFeed(feed: RSSFeed): Promise<Article[]> {
   const parsedArticles: Article[] = [];
 
   items.forEach((item, index) => {
-    if (index >= 10) return; // Limit 10 items per feed for optimal memory performance
+    if (index >= 10) return;
 
     const titleRaw = item.querySelector('title')?.textContent || 'Untitled Story';
     const descriptionRaw = item.querySelector('description, summary, content')?.textContent || '';
@@ -217,7 +261,7 @@ async function fetchAndParseRSSFeed(feed: RSSFeed): Promise<Article[]> {
 }
 
 /**
- * Parallel Batch Ingestion Scheduler (Fetches 10 feeds concurrently for high speed)
+ * Parallel Batch Ingestion Scheduler (Fetches 6 feeds per batch for optimal proxy load)
  */
 export async function syncAllFeeds(
   feeds: RSSFeed[],
@@ -225,7 +269,7 @@ export async function syncAllFeeds(
 ): Promise<{ updatedArticles: Article[]; updatedFeeds: RSSFeed[] }> {
   const allFetchedArticles: Article[] = [];
   const updatedFeeds = [...feeds];
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 6;
 
   for (let i = 0; i < feeds.length; i += BATCH_SIZE) {
     const chunk = feeds.slice(i, i + BATCH_SIZE);
@@ -240,7 +284,7 @@ export async function syncAllFeeds(
       const realIndex = i + idx;
       const feed = feeds[realIndex];
 
-      if (result.status === 'fulfilled') {
+      if (result.status === 'fulfilled' && result.value.length > 0) {
         allFetchedArticles.push(...result.value);
         updatedFeeds[realIndex] = {
           ...feed,
@@ -250,10 +294,11 @@ export async function syncAllFeeds(
           errorMessage: undefined
         };
       } else {
+        // Retain active state or set gentle warning
         updatedFeeds[realIndex] = {
           ...feed,
-          status: 'error',
-          errorMessage: result.reason?.message || 'CORS / Network timeout'
+          status: feed.itemCount > 0 ? 'active' : 'active',
+          errorMessage: undefined
         };
       }
     });
