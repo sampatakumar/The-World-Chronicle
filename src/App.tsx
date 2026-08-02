@@ -17,11 +17,12 @@ import { Dashboard } from './components/Dashboard';
 import { WorldNewsMap } from './components/WorldNewsMap';
 import { ArticleModal } from './components/ArticleModal';
 import { AudioPlayer } from './components/AudioPlayer';
+import { WelcomeSyncModal } from './components/WelcomeSyncModal';
 
 export function App() {
   const [currentView, setCurrentView] = useState<ViewMode>('newspaper');
   const [selectedCategory, setSelectedCategory] = useState<Category>('All');
-  const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>('Kannada');
+  const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>('English'); // English default
   const [searchQuery, setSearchQuery] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
   
@@ -32,6 +33,7 @@ export function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const [isAudioOpen, setIsAudioOpen] = useState(false);
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(true); // Open animated intro modal on load
   const [lastSyncTime, setLastSyncTimeState] = useState<string>(() => getLastSyncTime());
 
   // Dark mode effect
@@ -166,7 +168,7 @@ export function App() {
         isDarkMode={isDarkMode}
         onToggleDarkMode={() => setIsDarkMode(prev => !prev)}
         isSyncing={isSyncing}
-        onForceSync={handleForceSync}
+        onForceSync={() => setIsWelcomeOpen(true)}
         onExportPDF={handleExportPDF}
         onToggleAudioPlayer={() => setIsAudioOpen(prev => !prev)}
         isAudioPlaying={isAudioOpen}
@@ -218,6 +220,17 @@ export function App() {
           isSyncing={isSyncing}
         />
       )}
+
+      {/* Animated Welcome / Sync Feeds Intro Modal */}
+      <WelcomeSyncModal
+        isOpen={isWelcomeOpen}
+        onClose={() => setIsWelcomeOpen(false)}
+        onSync={handleForceSync}
+        isSyncing={isSyncing}
+        syncMessage={syncMessage}
+        selectedLanguage={selectedLanguage}
+        feedCount={feeds.length}
+      />
 
       {/* Article Detail Broadsheet Modal */}
       <ArticleModal
