@@ -4,13 +4,37 @@
 [![Next.js / Vite](https://img.shields.io/badge/Frontend-Vite%20%7C%20React%2019-blue.svg)](https://vitejs.dev/)
 [![Tailwind CSS v4](https://img.shields.io/badge/Styling-Tailwind%20v4-38bdf8.svg)](https://tailwindcss.com/)
 [![TypeScript](https://img.shields.io/badge/Language-TypeScript%205.7-3178c6.svg)](https://www.typescriptlang.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Vercel](https://img.shields.io/badge/Deploy-Vercel-black.svg)](https://vercel.com/)
 
 ---
 
 ## 🌟 Executive Overview
 
 **The World Chronicle** is an autonomous, full-screen digital newspaper application designed in the style of classic 20th-century broadsides (e.g., *The New York Times*, *The Guardian*). Powered by a client-side **Multi-Stage AI Pipeline**, it ingests real-time RSS feeds from **over 150 global publishers and news wire networks**, clusters breaking stories reporting on identical events, generates executive AI summaries, normalizes clickbait headlines, and organizes stories across multi-column broadside desks.
+
+---
+
+## 🚀 Vercel Deployment Guide
+
+We have pre-configured [vercel.json](file:///c:/projects/AllworldNewspaper/vercel.json) for **instant zero-configuration deployment** on Vercel:
+
+### Method 1: Deploy via GitHub (Recommended)
+1. Push your repository to GitHub:
+   ```bash
+   git add .
+   git commit -m "Deploy to Vercel"
+   git push origin main
+   ```
+2. Go to [Vercel Dashboard](https://vercel.com/new).
+3. Select **Import Git Repository** and choose `sampatakumar/The-World-Chronicle`.
+4. Keep framework preset as **Vite** (Vercel automatically detects `vercel.json`).
+5. Click **Deploy**!
+
+### Method 2: Deploy via Vercel CLI
+```bash
+npm install -g vercel
+vercel
+```
 
 ---
 
@@ -208,7 +232,7 @@ Below is the complete table of pre-configured live RSS streams integrated into *
    npm install
    ```
 
-3. **Start the local development server**:
+3. **Start local development server**:
    ```bash
    npm run dev
    ```
@@ -226,11 +250,10 @@ Below is the complete table of pre-configured live RSS streams integrated into *
 Run the following commands to push the repository to GitHub:
 
 ```bash
-git init
 git add .
 git commit -m "Initial commit: The World Chronicle Broadsheet Newspaper Engine with 150+ RSS Streams"
 git branch -M main
-git remote add origin https://github.com/username/repo-name.git
+git remote add origin https://github.com/sampatakumar/The-World-Chronicle.git
 git push -u origin main
 ```
 
