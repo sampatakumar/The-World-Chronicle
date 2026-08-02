@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  :root {
+    --paper-bg: #faf8f2;
+    --paper-card: #f3efe2;
+    --paper-card-hover: #eae4d3;
+    --ink-black: #0d0d0d;
+    --ink-dark: #1f1e1b;
+    --ink-muted: #4a4742;
+    --newspaper-border: #1a1a1a;
+    --accent-red: #8b0000;
+    --accent-gold: #b8860b;
+  }
+
+  .dark {
+    --paper-bg: #121212;
+    --paper-card: #1c1c1c;
+    --paper-card-hover: #262626;
+    --ink-black: #f5f5f4;
+    --ink-dark: #e7e5e4;
+    --ink-muted: #a8a29e;
+    --newspaper-border: #444444;
+    --accent-red: #ff4d4d;
+    --accent-gold: #d4af37;
+  }
+}
+
+/* Typography Utility Classes */
+.font-masthead {
+  font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
+}
+
+.font-gothic {
+  font-family: 'UnifrakturMaguntia', cursive, serif;
+}
+
+.font-serif-headline {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+.font-body-serif {
+  font-family: 'Merriweather', Georgia, serif;
+}
+
+.font-sans-ui {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Newspaper Layout Utilities */
+.newspaper-border-double {
+  border-bottom: 4px double var(--newspaper-border);
+}
+
+.newspaper-border-top-bottom {
+  border-top: 2px solid var(--newspaper-border);
+  border-bottom: 2px solid var(--newspaper-border);
+}
+
+.drop-cap::first-letter {
+  font-family: 'Playfair Display', Georgia, serif;
+  float: left;
+  font-size: 3.8rem;
+  line-height: 2.9rem;
+  padding-top: 4px;
+  padding-right: 10px;
+  padding-left: 2px;
+  font-weight: 900;
+  color: #8b0000;
+}
+
+.dark .drop-cap::first-letter {
+  color: #ff4d4d;
+}
+
+/* Authentic Paper Grain Texture for Light & Dark mode */
+.bg-paper-texture {
+  background-color: #faf8f2;
+  background-image: radial-gradient(#dcd5c4 0.6px, transparent 0.6px), radial-gradient(#dcd5c4 0.6px, #faf8f2 0.6px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+.dark .bg-paper-texture {
+  background-color: #121212;
+  background-image: radial-gradient(#2a2a2a 0.6px, transparent 0.6px), radial-gradient(#2a2a2a 0.6px, #121212 0.6px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+/* Print CSS Rules for PDF broadsheet generation */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .broadsheet-page {
+    page-break-after: always;
+    box-shadow: none !important;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--paper-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #a8a29e;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-black);
+}

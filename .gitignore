@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Production Builds
+dist
+build
+out
+
+# Project details, internal discussion logs & secrets
+project_details.txt
+discussion/
+discussion
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE & OS Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Antigravity & Agent workspace artifacts
+.gemini/
+.agents/
