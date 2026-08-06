@@ -11,7 +11,10 @@ import {
   AlertTriangle, 
   RotateCcw,
   Sparkles,
-  Globe
+  Globe,
+  Power,
+  Sliders,
+  XCircle
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -64,6 +67,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFeed, setEditingFeed] = useState<RSSFeed | null>(null);
   const [filterLang, setFilterLang] = useState<string>('All');
+  const [filterStatus, setFilterStatus] = useState<'All' | 'Active' | 'Inactive'>('All');
 
   // Form State
   const [name, setName] = useState('');
@@ -112,15 +116,65 @@ export const Dashboard: React.FC<DashboardProps> = ({
         category,
         publisher: publisher.trim(),
         language,
-        isCustom: true
+        isCustom: true,
+        isActive: true
       });
     }
     setIsModalOpen(false);
   };
 
-  const displayedFeeds = filterLang === 'All' 
-    ? feeds 
-    : feeds.filter(f => f.language === filterLang);
+  const handleToggleFeed = (feed: RSSFeed) => {
+    const isCurrentlyActive = feed.isActive !== false && feed.status !== 'inactive';
+    onUpdateFeed({
+      ...feed,
+      isActive: !isCurrentlyActive,
+      status: !isCurrentlyActive ? 'active' : 'inactive'
+    });
+  };
+
+  const handleActivateKannadaOnly = () => {
+    feeds.forEach(f => {
+      const isKannada = f.language === 'Kannada';
+      onUpdateFeed({
+        ...f,
+        isActive: isKannada,
+        status: isKannada ? 'active' : 'inactive'
+      });
+    });
+  };
+
+  const handleActivateAll = () => {
+    feeds.forEach(f => {
+      onUpdateFeed({
+        ...f,
+        isActive: true,
+        status: 'active'
+      });
+    });
+  };
+
+  const handleDeactivateAll = () => {
+    feeds.forEach(f => {
+      onUpdateFeed({
+        ...f,
+        isActive: false,
+        status: 'inactive'
+      });
+    });
+  };
+
+  const activeFeedsCount = feeds.filter(f => f.isActive !== false && f.status !== 'inactive').length;
+  const inactiveFeedsCount = feeds.length - activeFeedsCount;
+  const kannadaFeedsCount = feeds.filter(f => f.language === 'Kannada').length;
+
+  const displayedFeeds = feeds.filter(f => {
+    const matchesLang = filterLang === 'All' || f.language === filterLang;
+    const isFeedActive = f.isActive !== false && f.status !== 'inactive';
+    const matchesStatus = filterStatus === 'All' 
+      || (filterStatus === 'Active' && isFeedActive)
+      || (filterStatus === 'Inactive' && !isFeedActive);
+    return matchesLang && matchesStatus;
+  });
 
   return (
     <main className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 font-sans-ui transition-colors text-stone-950 dark:text-stone-100">
@@ -129,13 +183,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#f3efe2] dark:bg-[#1e1e1e] p-5 sm:p-6 rounded-xl border-2 border-stone-950 dark:border-stone-800 shadow-xs mb-6 sm:mb-8">
         <div>
           <div className="flex items-center gap-2 text-[#8b0000] dark:text-amber-400 font-bold text-xs uppercase tracking-widest mb-1">
-            <Rss className="w-4 h-4" /> Multilingual RSS Ingestion Engine
+            <Rss className="w-4 h-4" /> Optimized RSS Ingestion Engine
           </div>
           <h2 className="text-xl sm:text-3xl font-black text-stone-950 dark:text-stone-100">
-            RSS Feed Control Center ({feeds.length} Active Streams)
+            RSS Control Center ({activeFeedsCount} Active / {inactiveFeedsCount} Inactive)
           </h2>
           <p className="text-xs text-stone-800 dark:text-stone-400 mt-1 font-semibold">
-            Configured with 120+ global RSS networks, Google News, Bing News, Oneindia Kannada, and 1-hour automated background sync.
+            Kannada feeds active by default for fast loading. Activate or deactivate any RSS feed individually below.
           </p>
         </div>
 
@@ -146,7 +200,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             className="flex items-center gap-2 px-3.5 py-2.5 sm:px-4 sm:py-2 bg-[#8b0000] hover:bg-[#6b0000] text-white rounded-lg text-xs font-black uppercase tracking-wider transition-colors disabled:opacity-50 shadow-xs"
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-            <span>{isSyncing ? 'Syncing Feeds...' : 'Sync All Feeds Now'}</span>
+            <span>{isSyncing ? 'Syncing Active Feeds...' : 'Sync Active Feeds Now'}</span>
           </button>
 
           <button
@@ -167,29 +221,65 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Metrics & Language Filter Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-[#1e1e1e] p-4 rounded-xl border border-stone-950/20 dark:border-stone-800 mb-6 shadow-2xs">
+      {/* Quick Batch Controls & Metrics Bar */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-[#1e1e1e] p-4 rounded-xl border border-stone-950/20 dark:border-stone-800 mb-6 shadow-2xs">
+        
+        {/* Metrics Pill Badges */}
         <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
-          <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
-            <CheckCircle2 className="w-4 h-4" /> {feeds.filter(f => f.status === 'active').length} Active Feeds
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30">
+            <CheckCircle2 className="w-4 h-4" /> {activeFeedsCount} Active
           </span>
-          <span>•</span>
-          <span className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-            <Sparkles className="w-4 h-4" /> {feeds.filter(f => f.language === 'Kannada').length} Kannada Feeds
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border border-stone-300 dark:border-stone-700">
+            <XCircle className="w-4 h-4" /> {inactiveFeedsCount} Inactive
+          </span>
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#8b0000]/15 text-[#8b0000] dark:text-amber-400 border border-[#8b0000]/30">
+            <Sparkles className="w-4 h-4" /> {kannadaFeedsCount} Kannada Streams
           </span>
         </div>
 
-        {/* Filter by language */}
-        <div className="flex items-center gap-2 text-xs font-bold w-full sm:w-auto">
-          <Globe className="w-4 h-4 text-[#8b0000]" />
-          <span>Filter:</span>
+        {/* Quick Actions & Filters */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-bold w-full md:w-auto">
+          
+          {/* Quick Preset Buttons */}
+          <button
+            onClick={handleActivateKannadaOnly}
+            className="px-2.5 py-1.5 bg-[#8b0000] text-white hover:bg-[#6b0000] rounded text-[11px] font-black uppercase tracking-wider transition-colors shadow-2xs"
+            title="Activate only Kannada feeds and deactivate others for maximum speed"
+          >
+            Kannada Feeds Only
+          </button>
+          <button
+            onClick={handleActivateAll}
+            className="px-2.5 py-1.5 bg-emerald-700 text-white hover:bg-emerald-800 rounded text-[11px] font-black uppercase tracking-wider transition-colors shadow-2xs"
+          >
+            Activate All
+          </button>
+          <button
+            onClick={handleDeactivateAll}
+            className="px-2.5 py-1.5 bg-stone-700 text-white hover:bg-stone-800 rounded text-[11px] font-black uppercase tracking-wider transition-colors shadow-2xs"
+          >
+            Deactivate All
+          </button>
+
+          {/* Status Filter */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as any)}
+            className="bg-stone-100 dark:bg-stone-800 border border-stone-950/30 dark:border-stone-700 rounded px-2.5 py-1.5 text-xs text-stone-950 dark:text-white font-bold"
+          >
+            <option value="All">All Statuses ({feeds.length})</option>
+            <option value="Active">Active Only ({activeFeedsCount})</option>
+            <option value="Inactive">Inactive Only ({inactiveFeedsCount})</option>
+          </select>
+
+          {/* Language Filter */}
           <select
             value={filterLang}
             onChange={(e) => setFilterLang(e.target.value)}
-            className="bg-stone-100 dark:bg-stone-800 border border-stone-950/30 dark:border-stone-700 rounded px-3 py-1.5 text-xs text-stone-950 dark:text-white font-bold w-full sm:w-auto"
+            className="bg-stone-100 dark:bg-stone-800 border border-stone-950/30 dark:border-stone-700 rounded px-2.5 py-1.5 text-xs text-stone-950 dark:text-white font-bold"
           >
             <option value="All">All Languages ({feeds.length})</option>
-            <option value="Kannada">Kannada (ಕನ್ನಡ) ({feeds.filter(f => f.language === 'Kannada').length})</option>
+            <option value="Kannada">Kannada ({feeds.filter(f => f.language === 'Kannada').length})</option>
             <option value="English">English ({feeds.filter(f => f.language === 'English').length})</option>
           </select>
         </div>
@@ -199,14 +289,18 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border-2 border-stone-950 dark:border-stone-800 overflow-hidden shadow-xs">
         <div className="px-4 sm:px-6 py-4 border-b-2 border-stone-950 dark:border-stone-800 flex justify-between items-center bg-[#f3efe2] dark:bg-[#151515]">
           <h3 className="font-black text-stone-950 dark:text-stone-100 text-sm uppercase tracking-wider">
-            Active RSS Sources ({displayedFeeds.length})
+            RSS Catalog ({displayedFeeds.length} Streams Displayed)
           </h3>
+          <span className="text-xs text-stone-600 dark:text-stone-400 font-bold">
+            Toggle switch below to activate / deactivate individual feeds
+          </span>
         </div>
 
         <div className="overflow-x-auto touch-pan-x">
-          <table className="w-full text-left text-xs font-sans-ui min-w-[700px]">
+          <table className="w-full text-left text-xs font-sans-ui min-w-[750px]">
             <thead className="bg-stone-200 dark:bg-[#181818] text-stone-950 dark:text-stone-300 uppercase tracking-wider font-extrabold border-b border-stone-950/20 dark:border-stone-800">
               <tr>
+                <th className="py-3.5 px-4">Toggle Activation</th>
                 <th className="py-3.5 px-4">Status</th>
                 <th className="py-3.5 px-4">Language</th>
                 <th className="py-3.5 px-4">Feed Name & Publisher</th>
@@ -217,63 +311,96 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-200 dark:divide-stone-800 font-medium">
-              {displayedFeeds.map((feed) => (
-                <tr key={feed.id} className="hover:bg-[#f8f5eb] dark:hover:bg-[#252525] transition-colors">
-                  <td className="py-3.5 px-4">
-                    {feed.status === 'active' ? (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span> Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-500/15 text-red-700 dark:text-red-400 border border-red-500/30" title={feed.errorMessage}>
-                        <AlertTriangle className="w-3 h-3" /> Error
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-wider ${
-                      feed.language === 'Kannada' 
-                        ? 'bg-[#8b0000] text-white' 
-                        : 'bg-stone-900 text-white dark:bg-stone-700'
-                    }`}>
-                      {feed.language || 'English'}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 font-bold text-stone-950 dark:text-stone-100">
-                    <div>{feed.name}</div>
-                    <div className="text-[10px] text-stone-600 dark:text-stone-400 font-medium">{feed.publisher}</div>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded bg-stone-200 dark:bg-stone-800 font-bold text-stone-900 dark:text-stone-300 border border-stone-950/15">
-                      {feed.category}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4 text-stone-700 dark:text-stone-400 truncate max-w-xs font-mono text-[11px]" title={feed.url}>
-                    {feed.url}
-                  </td>
-                  <td className="py-3.5 px-4 text-stone-700 dark:text-stone-400 font-bold">
-                    {feed.lastFetched || 'Never'}
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+              {displayedFeeds.map((feed) => {
+                const isActive = feed.isActive !== false && feed.status !== 'inactive';
+                return (
+                  <tr key={feed.id} className={`transition-colors ${isActive ? 'hover:bg-[#f8f5eb] dark:hover:bg-[#252525]' : 'bg-stone-50/60 dark:bg-[#181818]/60 opacity-80'}`}>
+                    
+                    {/* Toggle Activation Button */}
+                    <td className="py-3.5 px-4">
                       <button
-                        onClick={() => openEditModal(feed)}
-                        className="p-1.5 hover:bg-stone-200 dark:hover:bg-stone-700 rounded text-stone-800 dark:text-stone-300 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
-                        title="Edit Feed"
+                        onClick={() => handleToggleFeed(feed)}
+                        className={`flex items-center gap-2 px-3 py-1 rounded-full font-black text-[11px] uppercase tracking-wider transition-all shadow-2xs border ${
+                          isActive
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-700'
+                            : 'bg-stone-300 hover:bg-stone-400 text-stone-800 dark:bg-stone-700 dark:text-stone-200 dark:hover:bg-stone-600 border-stone-400'
+                        }`}
+                        title={isActive ? 'Deactivate feed' : 'Activate feed'}
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
+                        <Power className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-stone-600 dark:text-stone-400'}`} />
+                        <span>{isActive ? 'Active' : 'Inactive'}</span>
                       </button>
-                      <button
-                        onClick={() => onDeleteFeed(feed.id)}
-                        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
-                        title="Remove Feed"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+
+                    {/* Status Badge */}
+                    <td className="py-3.5 px-4">
+                      {isActive ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span> Ready
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-stone-200 dark:bg-stone-800 text-stone-600 dark:text-stone-400 border border-stone-300 dark:border-stone-700">
+                          <XCircle className="w-3 h-3" /> Off
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Language */}
+                    <td className="py-3.5 px-4">
+                      <span className={`px-2 py-0.5 rounded text-[11px] font-black uppercase tracking-wider ${
+                        feed.language === 'Kannada' 
+                          ? 'bg-[#8b0000] text-white' 
+                          : 'bg-stone-900 text-white dark:bg-stone-700'
+                      }`}>
+                        {feed.language || 'English'}
+                      </span>
+                    </td>
+
+                    {/* Feed Name & Publisher */}
+                    <td className="py-3.5 px-4 font-bold text-stone-950 dark:text-stone-100">
+                      <div>{feed.name}</div>
+                      <div className="text-[10px] text-stone-600 dark:text-stone-400 font-medium">{feed.publisher}</div>
+                    </td>
+
+                    {/* Category */}
+                    <td className="py-3.5 px-4">
+                      <span className="px-2 py-0.5 rounded bg-stone-200 dark:bg-stone-800 font-bold text-stone-900 dark:text-stone-300 border border-stone-950/15">
+                        {feed.category}
+                      </span>
+                    </td>
+
+                    {/* Feed URL */}
+                    <td className="py-3.5 px-4 text-stone-700 dark:text-stone-400 truncate max-w-xs font-mono text-[11px]" title={feed.url}>
+                      {feed.url}
+                    </td>
+
+                    {/* Last Fetched */}
+                    <td className="py-3.5 px-4 text-stone-700 dark:text-stone-400 font-bold">
+                      {feed.lastFetched || 'Never'}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEditModal(feed)}
+                          className="p-1.5 hover:bg-stone-200 dark:hover:bg-stone-700 rounded text-stone-800 dark:text-stone-300 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+                          title="Edit Feed"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onDeleteFeed(feed.id)}
+                          className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-red-600 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+                          title="Remove Feed"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -229,7 +229,7 @@ export function App() {
         isSyncing={isSyncing}
         syncMessage={syncMessage}
         selectedLanguage={selectedLanguage}
-        feedCount={feeds.length}
+        feedCount={feeds.filter(f => f.isActive !== false && f.status !== 'inactive').length}
       />
 
       {/* Article Detail Broadsheet Modal */}

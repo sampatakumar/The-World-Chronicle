@@ -63,11 +63,12 @@ export interface RSSFeed {
   category: Category;
   publisher: string;
   language: SupportedLanguage;
-  status: 'active' | 'error' | 'syncing';
+  status: 'active' | 'inactive' | 'error' | 'syncing';
   lastFetched: string;
   itemCount: number;
   errorMessage?: string;
   isCustom?: boolean;
+  isActive?: boolean;
 }
 
 export interface NewspaperEdition {

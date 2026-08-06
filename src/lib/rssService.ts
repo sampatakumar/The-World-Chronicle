@@ -23,7 +23,23 @@ export function getStoredFeeds(): RSSFeed[] {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.length >= 20) {
-        return parsed;
+        const migrated = parsed.map((feed: RSSFeed) => {
+          const isKannada = feed.language === 'Kannada';
+          const isActive = feed.isActive !== undefined ? feed.isActive : isKannada;
+          return {
+            ...feed,
+            isActive,
+            status: isActive ? (feed.status === 'inactive' ? 'active' : feed.status) : ('inactive' as const)
+          };
+        });
+
+        migrated.sort((a: RSSFeed, b: RSSFeed) => {
+          if (a.language === 'Kannada' && b.language !== 'Kannada') return -1;
+          if (a.language !== 'Kannada' && b.language === 'Kannada') return 1;
+          return 0;
+        });
+
+        return migrated;
       }
     }
   } catch (e) {
@@ -269,42 +285,58 @@ export async function syncAllFeeds(
 ): Promise<{ updatedArticles: Article[]; updatedFeeds: RSSFeed[] }> {
   const allFetchedArticles: Article[] = [];
   const updatedFeeds = [...feeds];
-  const BATCH_SIZE = 6;
+  
+  // Filter ONLY active feeds for fast loading
+  const activeFeedsWithIndices = feeds
+    .map((feed, originalIndex) => ({ feed, originalIndex }))
+    .filter(({ feed }) => feed.isActive !== false && feed.status !== 'inactive');
 
-  for (let i = 0; i < feeds.length; i += BATCH_SIZE) {
-    const chunk = feeds.slice(i, i + BATCH_SIZE);
-    const progressPercent = Math.round(((i + chunk.length) / feeds.length) * 100);
-    onProgress?.(`Syncing feeds ${i + 1}–${Math.min(i + chunk.length, feeds.length)} of ${feeds.length}...`, progressPercent);
+  if (activeFeedsWithIndices.length === 0) {
+    onProgress?.('No active feeds to sync. Activate feeds in RSS Dashboard.', 100);
+    const existing = getStoredArticles();
+    return {
+      updatedArticles: existing,
+      updatedFeeds
+    };
+  }
+
+  const BATCH_SIZE = 6;
+  const totalActive = activeFeedsWithIndices.length;
+
+  for (let i = 0; i < totalActive; i += BATCH_SIZE) {
+    const chunkWithIndices = activeFeedsWithIndices.slice(i, i + BATCH_SIZE);
+    const progressPercent = Math.round(((i + chunkWithIndices.length) / totalActive) * 100);
+    onProgress?.(`Syncing active feeds ${i + 1}–${Math.min(i + chunkWithIndices.length, totalActive)} of ${totalActive}...`, progressPercent);
 
     const batchResults = await Promise.allSettled(
-      chunk.map(feed => fetchAndParseRSSFeed(feed))
+      chunkWithIndices.map(({ feed }) => fetchAndParseRSSFeed(feed))
     );
 
     batchResults.forEach((result, idx) => {
-      const realIndex = i + idx;
-      const feed = feeds[realIndex];
+      const { feed, originalIndex } = chunkWithIndices[idx];
 
       if (result.status === 'fulfilled' && result.value.length > 0) {
         allFetchedArticles.push(...result.value);
-        updatedFeeds[realIndex] = {
+        updatedFeeds[originalIndex] = {
           ...feed,
           status: 'active',
+          isActive: true,
           lastFetched: new Date().toISOString().replace('T', ' ').slice(0, 16),
           itemCount: result.value.length,
           errorMessage: undefined
         };
       } else {
-        // Retain active state or set gentle warning
-        updatedFeeds[realIndex] = {
+        updatedFeeds[originalIndex] = {
           ...feed,
-          status: feed.itemCount > 0 ? 'active' : 'active',
+          status: 'active',
+          isActive: true,
           errorMessage: undefined
         };
       }
     });
   }
 
-  // Merge newly fetched articles with existing initial broadside stories
+  // Merge newly fetched articles with existing stored stories
   const existing = getStoredArticles();
   const combined = [...allFetchedArticles, ...existing];
   
